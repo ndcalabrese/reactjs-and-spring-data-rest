@@ -7,6 +7,8 @@ const client = require('./client');
 
 const follow = require('./follow');
 
+const stompClient = require('./websocket-listener');
+
 const root = '/api';
 
 class App extends React.Component {
@@ -57,23 +59,14 @@ class App extends React.Component {
 
     // tag::create[]
     onCreate(newEmployee) {
-        const self = this;
-        follow(client, root, ['employees']).then(response => {
-            return client({
+        follow(client, root, ['employees']).done(response => {
+            client({
                 method: 'POST',
                 path: response.entity._links.self.href,
                 entity: newEmployee,
                 headers: {'Content-Type': 'application/json'}
             })
-        }).then(response => {
-            return follow(client, root, [{rel: 'employees', params: {'size': self.state.pageSize}}]);
-        }).done(response => {
-            if (typeof response.entity._links.last !== "undefined") {
-                this.onNavigate(response.entity._links.last.href);
-            } else {
-                this.onNavigate(response.entity._links.self.href);
-            }
-        });
+        })
     }
     // end::create[]
 
@@ -133,6 +126,49 @@ class App extends React.Component {
     }
     // end::navigate[]
 
+    refreshAndGoToLastPage(message) {
+        follow(client, root, [{
+            rel: 'employees',
+            params: {size: this.state.pageSize}
+        }]).done(response => {
+            if (response.entity._links.last !== undefined) {
+                this.onNavigate(response.entity._links.last.href);
+            } else {
+                this.onNavigate(response.entity._links.self.href);
+            }
+        })
+    }
+
+    refreshCurrentPage(message) {
+        follow(client, root, [{
+            rel: 'employees',
+            params: {
+                size: this.state.pageSize,
+                page: this.state.page.number
+            }
+        }]).then(employeeCollection => {
+            this.links = employeeCollection.entity._links;
+            this.page = employeeCollection.entity.page;
+
+            return employeeCollection.entity._embedded.employees.map(employee => {
+                return client({
+                    method: 'GET',
+                    path: employee._links.self.href
+                })
+            });
+        }).then(employeePromises => {
+            return when.all(employeePromises);
+        }).then(employees => {
+            this.setState({
+                page: this.page,
+                employees: employees,
+                attributes: Object.keys(this.schema.properties),
+                pageSize: this.state.pageSize,
+                links: this.links
+            });
+        });
+    }
+
     // tag::update-page-size[]
     updatePageSize(pageSize) {
         if (pageSize !== this.state.pageSize) {
@@ -144,6 +180,11 @@ class App extends React.Component {
     // tag::follow-1[]
     componentDidMount() {
         this.loadFromServer(this.state.pageSize);
+        stompClient.register([
+            {route: '/topic/newEmployee', callback: this.refreshAndGoToLastPage},
+            {route: '/topic/updateEmployee', callback: this.refreshCurrentPage},
+            {route: '/topic/deleteEmployee', callback: this.refreshCurrentPage}
+        ]);
     }
     // end::follow-1[]
 
