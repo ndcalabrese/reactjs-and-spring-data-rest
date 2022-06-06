@@ -5,7 +5,7 @@ const ReactDOM = require('react-dom');
 const when = require('when');
 const client = require('./client');
 
-const follow = require('./follow');
+const follow = require('./follow'); // function to hop multiple links by "rel"
 
 const stompClient = require('./websocket-listener');
 
@@ -15,8 +15,8 @@ class App extends React.Component {
 
     constructor(props) {
         super(props);
-        this.state = {employees: [], attributes: [], page: 1, pageSize: 2, links: {},
-        loggedInManager: this.props.loggedInManager};
+        this.state = {employees: [], attributes: [], page: 1, pageSize: 2, links: {}
+            , loggedInManager: this.props.loggedInManager};
         this.updatePageSize = this.updatePageSize.bind(this);
         this.onCreate = this.onCreate.bind(this);
         this.onUpdate = this.onUpdate.bind(this);
@@ -35,6 +35,11 @@ class App extends React.Component {
                 path: employeeCollection.entity._links.profile.href,
                 headers: {'Accept': 'application/schema+json'}
             }).then(schema => {
+                // tag::json-schema-filter[]
+                /**
+                 * Filter unneeded JSON Schema properties, like uri references and
+                 * subtypes ($ref).
+                 */
                 Object.keys(schema.entity.properties).forEach(function (property) {
                     if (schema.entity.properties[property].hasOwnProperty('format') &&
                         schema.entity.properties[property].format === 'uri') {
@@ -48,6 +53,7 @@ class App extends React.Component {
                 this.schema = schema.entity;
                 this.links = employeeCollection.entity._links;
                 return employeeCollection;
+                // end::json-schema-filter[]
             });
         }).then(employeeCollection => {
             this.page = employeeCollection.entity.page;
@@ -70,6 +76,7 @@ class App extends React.Component {
         });
     }
 
+    // tag::on-create[]
     onCreate(newEmployee) {
         follow(client, root, ['employees']).done(response => {
             client({
@@ -80,7 +87,9 @@ class App extends React.Component {
             })
         })
     }
+    // end::on-create[]
 
+    // tag::on-update[]
     onUpdate(employee, updatedEmployee) {
         if(employee.entity.manager.name === this.state.loggedInManager) {
             updatedEmployee["manager"] = employee.entity.manager;
@@ -93,6 +102,7 @@ class App extends React.Component {
                     'If-Match': employee.headers.Etag
                 }
             }).done(response => {
+                /* Let the websocket handler update the state */
             }, response => {
                 if (response.status.code === 403) {
                     alert('ACCESS DENIED: You are not authorized to update ' +
@@ -107,10 +117,12 @@ class App extends React.Component {
             alert("You are not authorized to update");
         }
     }
+    // end::on-update[]
 
+    // tag::on-delete[]
     onDelete(employee) {
         client({method: 'DELETE', path: employee.entity._links.self.href}
-        ).done(response => {},
+        ).done(response => {/* let the websocket handle updating the UI */},
             response => {
                 if (response.status.code === 403) {
                     alert('ACCESS DENIED: You are not authorized to delete ' +
@@ -118,6 +130,7 @@ class App extends React.Component {
                 }
             });
     }
+    // end::on-delete[]
 
     onNavigate(navUri) {
         client({
@@ -146,6 +159,13 @@ class App extends React.Component {
         });
     }
 
+    updatePageSize(pageSize) {
+        if (pageSize !== this.state.pageSize) {
+            this.loadFromServer(pageSize);
+        }
+    }
+
+    // tag::websocket-handlers[]
     refreshAndGoToLastPage(message) {
         follow(client, root, [{
             rel: 'employees',
@@ -188,13 +208,9 @@ class App extends React.Component {
             });
         });
     }
+    // end::websocket-handlers[]
 
-    updatePageSize(pageSize) {
-        if (pageSize !== this.state.pageSize) {
-            this.loadFromServer(pageSize);
-        }
-    }
-
+    // tag::register-handlers[]
     componentDidMount() {
         this.loadFromServer(this.state.pageSize);
         stompClient.register([
@@ -203,6 +219,7 @@ class App extends React.Component {
             {route: '/topic/deleteEmployee', callback: this.refreshCurrentPage}
         ]);
     }
+    // end::register-handlers[]
 
     render() {
         return (
@@ -355,23 +372,26 @@ class EmployeeList extends React.Component {
         e.preventDefault();
         this.props.onNavigate(this.props.links.first.href);
     }
+
     handleNavPrev(e) {
         e.preventDefault();
         this.props.onNavigate(this.props.links.prev.href);
     }
+
     handleNavNext(e) {
         e.preventDefault();
         this.props.onNavigate(this.props.links.next.href);
     }
+
     handleNavLast(e) {
         e.preventDefault();
         this.props.onNavigate(this.props.links.last.href);
     }
 
     render() {
-        const pageInfo = this.props.page.hasOwnProperty("number")
-            ? <h3>Employees - Page {this.props.page.number + 1} of {this.props.page.totalPages}</h3>
-            : null;
+        const pageInfo = this.props.page.hasOwnProperty("number") ?
+            <h3>Employees - Page {this.props.page.number + 1} of {this.props.page.totalPages}</h3> : null;
+
         const employees = this.props.employees.map(employee =>
             <Employee key={employee.entity._links.self.href}
                       employee={employee}
@@ -420,6 +440,7 @@ class EmployeeList extends React.Component {
     }
 }
 
+// tag::employee[]
 class Employee extends React.Component {
 
     constructor(props) {
@@ -451,8 +472,9 @@ class Employee extends React.Component {
         )
     }
 }
+// end::employee[]
 
 ReactDOM.render(
-    <App loggedInManager={document.getElementById('managername').innerHTML }/>,
+    <App loggedInManager={document.getElementById('managername').innerHTML } />,
     document.getElementById('react')
 )

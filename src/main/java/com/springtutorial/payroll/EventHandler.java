@@ -1,5 +1,6 @@
 package com.springtutorial.payroll;
 
+
 import static com.springtutorial.payroll.WebSocketConfiguration.*;
 
 import org.springframework.beans.factory.annotation.Autowired;

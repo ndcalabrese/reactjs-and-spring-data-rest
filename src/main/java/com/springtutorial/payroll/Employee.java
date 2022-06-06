@@ -10,6 +10,7 @@ import javax.persistence.Version;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
+// tag::code[]
 @Entity
 public class Employee {
 
@@ -17,44 +18,40 @@ public class Employee {
     private String firstName;
     private String lastName;
     private String description;
+
     private @Version @JsonIgnore Long version;
-    private @ManyToOne Manager manager;
 
-    public Employee() {}
+    private @ManyToOne Manager manager; // <1>
 
-    public Employee(String firstName, String lastName,
-                    String description, Manager manager) {
+
+    public Employee(String firstName, String lastName, String description, Manager manager) { // <2>
         this.firstName = firstName;
         this.lastName = lastName;
         this.description = description;
         this.manager = manager;
     }
 
+    public Employee() {
+
+    }
+
     @Override
     public boolean equals(Object o) {
-
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
         Employee employee = (Employee) o;
-
-        return Objects.equals(id, employee.id)
-                && Objects.equals(firstName, employee.firstName)
-                && Objects.equals(lastName, employee.lastName)
-                && Objects.equals(description, employee.description)
-                && Objects.equals(version, employee.version)
-                && Objects.equals(manager, employee.manager);
+        return Objects.equals(id, employee.id) &&
+                Objects.equals(firstName, employee.firstName) &&
+                Objects.equals(lastName, employee.lastName) &&
+                Objects.equals(description, employee.description) &&
+                Objects.equals(version, employee.version) &&
+                Objects.equals(manager, employee.manager);
     }
 
     @Override
     public int hashCode() {
 
-        return Objects.hash(id, firstName, lastName, description,
-                version, manager);
+        return Objects.hash(id, firstName, lastName, description, version, manager);
     }
 
     public Long getId() {
@@ -109,10 +106,11 @@ public class Employee {
     public String toString() {
         return "Employee{" +
                 "id=" + id +
-                ", firstName='" + firstName + "', lastName='"
-                + lastName + "', description='" + description
-                + "', version=" + version
-                + ", manager=" + manager +
-                "}";
+                ", firstName='" + firstName + '\'' +
+                ", lastName='" + lastName + '\'' +
+                ", description='" + description + '\'' +
+                ", version=" + version +
+                ", manager=" + manager +
+                '}';
     }
 }
